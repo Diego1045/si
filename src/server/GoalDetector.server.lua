@@ -11,6 +11,7 @@ local ball = workspace:WaitForChild(BALL_NAME)
 -- Valores de puntuación (gestionados por GameManager, pero leídos/escritos aquí)
 local HomeScore = ReplicatedStorage:WaitForChild("HomeScore")
 local AwayScore = ReplicatedStorage:WaitForChild("AwayScore")
+local GameState = ReplicatedStorage:WaitForChild("GameState")
 local GoalScoredEvent = ReplicatedStorage:FindFirstChild("GoalScored") 
 if not GoalScoredEvent then
 	GoalScoredEvent = Instance.new("RemoteEvent")
@@ -28,7 +29,21 @@ if not goalHome or not goalAway then
 end
 
 local cooldown = false
+local COOLDOWN_TIME = 5 -- Segundos de cooldown entre goles
 local resetPosition = ball:IsA("BasePart") and ball.CFrame or CFrame.new(0, 5, 0)
+
+-- Inicializar GoalDetected al inicio (para que GoalManager pueda escucharlo)
+-- 🔒 CRÍTICO: Solo GoalDetector crea este objeto para evitar duplicados
+local GoalDetected = ReplicatedStorage:FindFirstChild("GoalDetected")
+if not GoalDetected then
+	GoalDetected = Instance.new("StringValue")
+	GoalDetected.Name = "GoalDetected"
+	GoalDetected.Value = ""
+	GoalDetected.Parent = ReplicatedStorage
+	print("[GoalDetector] ✅ GoalDetected creado en ReplicatedStorage")
+else
+	print("[GoalDetector] ✅ GoalDetected ya existe (reutilizando instancia existente)")
+end
 
 local function isBallInside(part)
 	if not part or not (ball and ball.Parent) then return false end
@@ -47,10 +62,18 @@ end
 
 local function handleGoal(teamScored)
 	if cooldown then return end
+	
+	-- 🔒 BUG FIX: Verificar GameState antes de procesar el gol
+	if GameState.Value ~= "Playing" then
+		print("[GoalDetector] ⚠️ Gol ignorado - GameState no es 'Playing': " .. tostring(GameState.Value))
+		return
+	end
+	
 	cooldown = true
 	
 	print("⚽ ¡GOL de " .. teamScored .. "!")
 	
+	-- Actualizar marcador (solo aquí para evitar doble conteo)
 	if teamScored == "Home" then
 		HomeScore.Value += 1
 	elseif teamScored == "Away" then
@@ -59,6 +82,11 @@ local function handleGoal(teamScored)
 	
 	-- Notificar clientes (para efectos, UI, etc.)
 	GoalScoredEvent:FireAllClients(teamScored)
+	
+	-- Notificar a GoalManager mediante un valor compartido (para celebración)
+	-- GoalDetected ya está inicializado al inicio del script
+	GoalDetected.Value = teamScored -- Notificar equipo que marcó
+	print("[GoalDetector] 📢 Notificando a GoalManager: " .. teamScored)
 	
 	-- Resetear balón
 	local ballPart = ball:IsA("BasePart") and ball or ball:FindFirstChildWhichIsA("BasePart", true)
@@ -70,8 +98,12 @@ local function handleGoal(teamScored)
 		ballPart.CanCollide = true
 	end
 	
-	task.delay(2, function()
+	task.delay(COOLDOWN_TIME, function()
 		cooldown = false
+		-- Limpiar notificación después del cooldown
+		if GoalDetected then
+			GoalDetected.Value = ""
+		end
 	end)
 end
 
