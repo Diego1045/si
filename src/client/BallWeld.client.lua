@@ -32,7 +32,23 @@ local humanoid = character:WaitForChild("Humanoid")
 -- 🎬 Animaciones de carga (mientras se mantiene click) y de soltado
 local chargingAnimId = "rbxassetid://123401211024413"
 local releaseAnimId = "rbxassetid://114066407142790"
-local chargingAnimTrack, releaseAnimTrack do
+local chargingAnimTrack, releaseAnimTrack = nil, nil
+
+-- Función para inicializar/cargar las animaciones
+local function initializeAnimations()
+	if not humanoid then return end
+	
+	-- Limpiar tracks anteriores si existen
+	if chargingAnimTrack then
+		chargingAnimTrack:Stop()
+		chargingAnimTrack = nil
+	end
+	if releaseAnimTrack then
+		releaseAnimTrack:Stop()
+		releaseAnimTrack = nil
+	end
+	
+	-- Cargar las animaciones
 	local a1 = Instance.new("Animation")
 	a1.AnimationId = chargingAnimId
 	local a2 = Instance.new("Animation")
@@ -43,6 +59,9 @@ local chargingAnimTrack, releaseAnimTrack do
 	chargingAnimTrack.Priority = Enum.AnimationPriority.Action
 	releaseAnimTrack.Priority = Enum.AnimationPriority.Action
 end
+
+-- Inicializar animaciones al inicio
+initializeAnimations()
 
 -- RemoteEvents para comunicarse con el servidor (compatible con ambos nombres)
 local remoteWeldBall = ReplicatedStorage:FindFirstChild("wel ball") or ReplicatedStorage:FindFirstChild("WeldBall")
@@ -225,6 +244,10 @@ end
 player.CharacterAdded:Connect(function(newCharacter)
 	character = newCharacter
 	rootPart = newCharacter:WaitForChild("HumanoidRootPart")
+	humanoid = newCharacter:WaitForChild("Humanoid")
+	
+	-- Recargar animaciones para el nuevo character
+	initializeAnimations()
 	
 	-- Inicializar atributos y barra de fuerza
 	initializeCharacterAttributes(character)
